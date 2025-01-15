@@ -1,7 +1,8 @@
-/*!
-# Platform-agnostic driver for 3X4 numeric keypads
 
-Provides a driver for reading from standard 3X4 keypads
+/*!
+# Platform-agnostic driver for 4X4 numeric keypads
+
+Provides a driver for reading from standard 4X4 keypads
 
 ## Example
 
@@ -17,6 +18,7 @@ let cols = (
     gpioa.pa8.into_open_drain_output(&mut gpioa.crh),
     gpiob.pb5.into_open_drain_output(&mut gpiob.crl),
     gpioc.pc7.into_open_drain_output(&mut gpioc.crl),
+    gpioc.pc6.into_open_drain_output(&mut gpioc.crl),
 );
 
 let mut keypad = Keypad::new(rows, cols);
@@ -27,24 +29,20 @@ if key != ' ' {
 }
 ```
 */
-#![no_std]
-pub mod keypad_4x4;
-pub mod utils;
-
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 use embedded_hal::blocking::delay::DelayMs;
-use utils::convert;
 
+use crate::utils::convert;
 /// Defines a type that makes it easier to supply the four pins required for rows in the keypad.
 /// These pins need to support the `embedded_hal::digital::v2::InputPin` trait
 pub type Rows<R0, R1, R2, R3> = (R0, R1, R2, R3);
 
 /// Defines a type that makes it easier to supply the four pins required for rows in the keypad
 /// These pins need to support the `embedded_hal::digital::v2::OutputPin` trait
-pub type Columns<C0, C1, C2> = (C0, C1, C2);
+pub type Columns<C0, C1, C2, C3> = (C0, C1, C2, C3);
 
 /// Manages the pins and the logic for scanning a keypad
-pub struct Keypad<
+pub struct Keypad4x4<
     R0: InputPin,
     R1: InputPin,
     R2: InputPin,
@@ -52,9 +50,10 @@ pub struct Keypad<
     C0: OutputPin,
     C1: OutputPin,
     C2: OutputPin,
+    C3: OutputPin,
 > {
     rows: Rows<R0, R1, R2, R3>,
-    columns: Columns<C0, C1, C2>,
+    columns: Columns<C0, C1, C2, C3>,
 }
 
 impl<
@@ -65,10 +64,11 @@ impl<
         C0: OutputPin,
         C1: OutputPin,
         C2: OutputPin,
-    > Keypad<R0, R1, R2, R3, C0, C1, C2>
+        C3: OutputPin,
+    > Keypad4x4<R0, R1, R2, R3, C0, C1, C2, C3>
 {
     /// Create a new instance of this structure
-    pub fn new(rows: Rows<R0, R1, R2, R3>, columns: Columns<C0, C1, C2>) -> Self {
+    pub fn new(rows: Rows<R0, R1, R2, R3>, columns: Columns<C0, C1, C2, C3>) -> Self {
         Self { rows, columns }
     }
 
@@ -106,7 +106,9 @@ impl<
         self.columns.2.set_low().unwrap_or_default();
         res |= self.read_column(delay) << 8;
         self.columns.2.set_high().unwrap_or_default();
-
+        self.columns.3.set_low().unwrap_or_default();
+        res |= self.read_column(delay) << 12;
+        self.columns.3.set_high().unwrap_or_default();
         res
     }
 
@@ -117,6 +119,10 @@ impl<
         match value {
             -1 => '*',
             -2 => '#',
+            -3 => 'A',
+            -4 => 'B',
+            -5 => 'C',
+            -6 => 'D',
             _ => char::from_digit(value as u32, 10).unwrap(),
         }
     }
@@ -140,4 +146,10 @@ impl<
 
         res
     }
+
+    // Converts the raw value (2^N) from the read() method into a keypad digit. This will be
+    //      0..9    digits
+    //      -1      *
+    //      -2      #
+    //      -3      A
 }
