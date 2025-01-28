@@ -31,8 +31,8 @@ if key != ' ' {
 pub mod keypad_4x4;
 pub mod utils;
 
-use embedded_hal::digital::v2::{InputPin, OutputPin};
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_hal::delay::DelayNs;
 use utils::convert;
 
 /// Defines a type that makes it easier to supply the four pins required for rows in the keypad.
@@ -81,7 +81,7 @@ impl<
     * `'#'`
     * `' '` if no keys are pressed.
     */
-    pub fn read_char(&mut self, delay: &mut dyn DelayMs<u16>) -> char {
+    pub fn read_char(&mut self, delay: &mut dyn DelayNs) -> char {
         let raw = self.read(delay);
         if raw != 0 {
             self.get_char(raw)
@@ -92,7 +92,7 @@ impl<
 
     // Performs a "raw" read of the keypad and returns a bit set for each key down. Note,
     // this doesn't mean this code supports multiple key presses.
-    fn read(&mut self, delay: &mut dyn DelayMs<u16>) -> u16 {
+    fn read(&mut self, delay: &mut dyn DelayNs) -> u16 {
         let mut res = 0;
 
         self.columns.0.set_low().unwrap_or_default();
@@ -121,10 +121,10 @@ impl<
         }
     }
 
-    fn read_column(&self, delay: &mut dyn DelayMs<u16>) -> u16 {
+    fn read_column(&mut self, delay: &mut dyn DelayNs) -> u16 {
         let mut res = 0;
 
-        delay.delay_ms(1u16);
+        delay.delay_ms(1u32);
         if self.rows.0.is_low().unwrap_or_default() {
             res |= 1 << 0;
         }
